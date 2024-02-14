@@ -1,0 +1,6 @@
+*.pdf
+*.zip
+*.tsv
+*.tsv#
+
+/coursework-1-data
