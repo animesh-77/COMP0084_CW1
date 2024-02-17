@@ -61,36 +61,41 @@ with open("passage-collection.txt", "r") as f:
 
         #     break
 
-df = pd.DataFrame.from_dict(all_tokens, orient="index", columns=["Count"])
-df = df.reset_index()
-df.rename({"index": "1-gram"}, inplace=True)
-df.to_csv("passage_collection_stat.csv", index=False)
+vocab_df = pd.DataFrame.from_dict(
+    all_tokens,
+    orient="index",
+    columns=["Count"],
+)
+vocab_df = vocab_df.reset_index()
+vocab_df.rename({"index": "1-gram"}, inplace=True)
 
 
-df = pd.read_csv("passage_collection_stat.csv")
+vocab_df_sorted = vocab_df.sort_values(by=["Count"], ascending=False)
+vocab_df_sorted["rank"] = (vocab_df.index + 1).astype(float)
 
-df_sorted = df.sort_values(by=["Count"], ascending=False)
-df_sorted["rank"] = (df.index + 1).astype(float)
-
-total_voc = np.sum(df_sorted["Count"])
-df_sorted["Freq"] = df_sorted["Count"] / total_voc
-df_sorted["Freq*rank"] = df_sorted["Freq"] * df_sorted["rank"]
-
-
-# print(df_sorted.head(20))
+total_voc = np.sum(vocab_df_sorted["Count"])
+vocab_df_sorted["Freq"] = vocab_df_sorted["Count"] / total_voc
+vocab_df_sorted["Freq*rank"] = vocab_df_sorted["Freq"] * vocab_df_sorted["rank"]
+vocab_df_sorted.to_csv("passage_collection_stats.csv", index=False)
+# print(vocab_df_sorted.head(20))
 
 
-Hn = np.sum(np.reciprocal(df_sorted["rank"]))
+Hn = np.sum(np.reciprocal(vocab_df_sorted["rank"]))
 
-zipf_freq = np.reciprocal(df_sorted["rank"] * Hn)
+zipf_freq = np.reciprocal(vocab_df_sorted["rank"] * Hn)
 
 
 plt.title("Zipf's Law Comparison")
 plt.xlabel("Frequence ranking of term")
 plt.ylabel("Prob of occurence of term")
-plt.plot(df_sorted["rank"], df_sorted["Freq"], color="blue", label="Data")
 plt.plot(
-    df_sorted["rank"],
+    vocab_df_sorted["rank"],
+    vocab_df_sorted["Freq"],
+    color="blue",
+    label="Data",
+)
+plt.plot(
+    vocab_df_sorted["rank"],
     zipf_freq,
     linestyle="--",
     color="black",
@@ -105,9 +110,14 @@ plt.show()
 plt.title("Zipf's Law Comparison in log scale")
 plt.xlabel("Frequence ranking of term")
 plt.ylabel("Prob of occurence of term")
-plt.loglog(df_sorted["rank"], df_sorted["Freq"], color="blue", label="Data")
 plt.loglog(
-    df_sorted["rank"],
+    vocab_df_sorted["rank"],
+    vocab_df_sorted["Freq"],
+    color="blue",
+    label="Data",
+)
+plt.loglog(
+    vocab_df_sorted["rank"],
     zipf_freq,
     linestyle="--",
     color="black",
