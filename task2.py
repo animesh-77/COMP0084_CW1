@@ -1,4 +1,4 @@
-import json
+import pickle
 
 import nltk  # type:ignore
 import pandas as pd
@@ -117,6 +117,10 @@ if __name__ == "__main__":
         #     break
 
     # print(inverted_index)
-    with open("inverted_index.json", "w") as f:
-        json.dump(inverted_index, f)
-        print("Done Saving inverted index as .json file")
+    # with open("inverted_index.json", "w") as f:
+    #     json.dump(inverted_index, f)
+    #     print("Done Saving inverted index as .json file")
+
+    with open("inverted_index.pickle", "wb") as f:
+        pickle.dump(inverted_index, f, protocol=pickle.HIGHEST_PROTOCOL)
+        print("Done Saving inverted index as .pickle file")
