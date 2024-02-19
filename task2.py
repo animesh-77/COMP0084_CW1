@@ -88,10 +88,16 @@ def get_inverted_index():
 
     vocab_df_sorted = pd.read_csv(
         "passage_collection_stats.csv",
+        na_filter=False,
     )
     inverted_index = {}
     for token in vocab_df_sorted["token"]:
-        inverted_index[token] = {}
+        if token not in inverted_index:
+            inverted_index[token] = {}
+        else:
+            # ideally it should never come here since
+            # all tokens should be unique
+            print(token, type(token))
 
     return inverted_index
 
@@ -113,3 +119,4 @@ if __name__ == "__main__":
     # print(inverted_index)
     with open("inverted_index.json", "w") as f:
         json.dump(inverted_index, f)
+        print("Done Saving inverted index as .json file")
