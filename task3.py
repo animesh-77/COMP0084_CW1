@@ -1,7 +1,9 @@
 import pickle
-import numpy as np
 
+import numpy as np
 import pandas as pd
+from scipy.spatial import distance  # type:ignore
+
 from tqdm import tqdm  # type:ignore
 
 import task1
@@ -154,9 +156,10 @@ def TF_IDF_one_query(
 def TF_IDF_all_queries(corpus_size: float):
     """
     TF_IDF_all_queries iterate over all queries and
-    calculate and store TF_IDF score
+    calculate and store TF_IDF score in a dictionary
 
-    _extended_summary_
+    afterwards this dictionary is saved as a pickle for fast
+    retrievel
 
     :param corpus_size: _description_
     :type corpus_size: float
@@ -168,7 +171,10 @@ def TF_IDF_all_queries(corpus_size: float):
     tf_idf_queries = {}
     for qid, query in tqdm(zip(qids, queries)):
         tf_idf_queries[qid] = TF_IDF_one_query(
-            qid, query, float(corpus_size), inverted_index
+            qid,
+            query,
+            float(corpus_size),
+            inverted_index,
         )
         # break
 
@@ -177,25 +183,68 @@ def TF_IDF_all_queries(corpus_size: float):
         print("Done Saving TF-IDF of all queries as .pickle file")
 
 
-def cosine_score(tf_idf_passage, tf_idf_query):
+def cosine_score(tf_idf_passage: dict, tf_idf_query: dict) -> float:
+    """
+    cosine_score Computes the cosine score between 2 TF-IDF vectors,
+    one of document and one of query
 
-    score = None
+    scipy is used to generate cosine score between 2 vectors
 
-    for q_token, q_token_tf_idf in tf_idf_query.items():
-        if q_token in tf_idf_passage:
+    :param tf_idf_passage: TF-IDF vector of passage as a dictionary
+    :type tf_idf_passage: dict
+    :param tf_idf_query: TF-IDF vector of query as a dictionary
+    :type tf_idf_query: dict
+    :return: cosine similarity of 2 TF-IDF vectors
+    :rtype: float
+    """
 
-            if score is None:
-                score = tf_idf_passage[q_token] * q_token_tf_idf
-            else:
-                score += tf_idf_passage[q_token] * q_token_tf_idf
+    df_passage = pd.DataFrame.from_dict(
+        tf_idf_passage,
+        orient="index",
+        columns=["passage"],
+    )
+    df_query = pd.DataFrame.from_dict(
+        tf_idf_query,
+        orient="index",
+        columns=["query"],
+    )
 
-    if score is None:
-        return float("-inf")
-    else:
-        return score
+    df = pd.merge(
+        left=df_passage,
+        left_index=True,
+        right=df_query,
+        right_index=True,
+        how="outer",
+    )
+    df.fillna(value=0.0, inplace=True)
+
+    score = 1 - distance.cosine(df["passage"], df["query"])
+
+    return score
 
 
-def top100_pids_score(qid, tf_idf_passages, tf_idf_query, unique_pids):
+def top100_pids_score(
+    qid: int, tf_idf_passages: dict, tf_idf_query: dict, unique_pids: pd.Series
+) -> pd.DataFrame:
+    """
+    top100_pids_score Get top 100 documents based on cosine score between
+    TF-IDF vector
+    representation of document and query
+
+    Returns a dataframe for this ONE query.
+    qid, pid, score
+
+    :param qid: unique query identifier currently being worked on
+    :type qid: int
+    :param tf_idf_passages: TF-IDF representation of all passasges
+    :type tf_idf_passages: dict
+    :param tf_idf_query: TF-IDF representation of ONE query
+    :type tf_idf_query: dict
+    :param unique_pids: list of all documents which are to be ranked
+    :type unique_pids: pd.Series
+    :return: Dataframe of qid, pid, score .total size <=100
+    :rtype: pd.DataFrame
+    """
 
     # top100_pid_score_df = pd.DataFrame(columns=["qid", "pid", "score"])
 
@@ -207,12 +256,9 @@ def top100_pids_score(qid, tf_idf_passages, tf_idf_query, unique_pids):
 
         scores[index] = cosine_score(tf_idf_passages[pid], tf_idf_query)
 
-    valid_scores = scores[~np.isinf(scores)]
-    valid_pids = pids[~np.isinf(scores)]
-
-    sorted_index = np.argsort(valid_scores)
-    sorted_scores = valid_scores[sorted_index][::-1]
-    sorted_pids = valid_pids[sorted_index][::-1]
+    sorted_index = np.argsort(scores)
+    sorted_scores = scores[sorted_index][::-1]
+    sorted_pids = pids[sorted_index][::-1]
 
     top100_scores = sorted_scores[:100]
     top100_pids = sorted_pids[:100]
@@ -226,6 +272,17 @@ def top100_pids_score(qid, tf_idf_passages, tf_idf_query, unique_pids):
 
 
 def iterate_qids():
+    """
+    iterate_qids Iterate over all qids get (at most) top 100 documents and
+    save final dataframe as a .csv
+
+    Pseude Code
+    1) Iterate over all qids
+    2) Select candidate passages that are to be re-ranked from
+    candidate-passages-top1000.tsv
+    3) get (at most) top 100 documents and their scores
+    4) store the values in a dataframe and then save it
+    """
 
     with open("tf_idf_passages.pickle", "rb") as handle:
         tf_idf_passages = pickle.load(handle)
@@ -244,8 +301,6 @@ def iterate_qids():
         "query",
         "passage",
     ]  # type:ignore
-
-    unique_pids, _ = task2.get_unique_pids()
 
     qids, _ = get_test_queries()
 
@@ -270,7 +325,7 @@ def iterate_qids():
     print("Done Saving top 100 scores of all queries as .csv file")
 
 
-corpus_size = TF_IDF_all_passages()
-TF_IDF_all_queries(corpus_size)
+# corpus_size = TF_IDF_all_passages()
+# TF_IDF_all_queries(corpus_size)
 
 iterate_qids()
