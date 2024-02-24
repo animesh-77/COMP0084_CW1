@@ -38,15 +38,15 @@ def score_Laplace(
 
     query_tokens = set(task1.work_one_line(query))
 
-    score = 1.0
+    score = 0.0
 
     for query_token in query_tokens:
         num = inverted_index.get(query_token, {}).get(pid, 0) + 1
         den = float(doc_length) + float(vocab_length)
 
-        score *= num / den
+        score += np.log(num) - np.log(den)
 
-    return np.log(score)
+    return score
 
 
 def top100_pids_score_Laplace(
@@ -206,15 +206,15 @@ def score_Lidstone(
 
     query_tokens = set(task1.work_one_line(query))
 
-    score = 1.0
+    score = 0.0
 
     for query_token in query_tokens:
         num = inverted_index.get(query_token, {}).get(pid, 0) + epsilon
         den = float(doc_length) + epsilon * float(vocab_length)
 
-        score *= num / den
+        score += np.log(num) - np.log(den)
 
-    return np.log(score)
+    return score
 
 
 def top100_pids_score_Lidstone(
