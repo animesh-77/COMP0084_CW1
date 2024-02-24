@@ -325,7 +325,194 @@ def iterate_qids():
     print("Done Saving top 100 scores of all queries as .csv file")
 
 
-# corpus_size = TF_IDF_all_passages()
-# TF_IDF_all_queries(corpus_size)
+def BM25_score(
+    query: str,
+    query_inverted_index: dict,
+    inverted_index: dict,
+    pid: int,
+    doc_length: int,
+    avg_doc_length: float,
+    corpus_size: float,
+    k1: float = 1.2,
+    k2: float = 100,
+    b: float = 0.75,
+) -> float:
+
+    K = k1 * ((1 - b) + b * (float(doc_length) / avg_doc_length))
+
+    query_tokens = set(task1.work_one_line(query))
+    score = 0.0
+
+    for query_token in query_tokens:
+        try:
+            a1 = 1 / (corpus_size - inverted_index[query_token]["count"] + 0.5)
+            a2 = ((k1 + 1) * inverted_index[query_token][pid]) / (
+                K + inverted_index[query_token][pid]
+            )
+            a3 = ((k2 + 1) * query_inverted_index[query_token]) / (
+                k2 * query_inverted_index[query_token]
+            )
+
+            score += np.log(a1) * a2 * a3
+
+        except KeyError:
+            # print(f"Exception {e} for token {query_token}")
+            score += 0
+
+    return score
+
+
+def top100_pids_score_BM25(
+    qid: int,
+    query: str,
+    qid_unique_pids: pd.Series,
+    qid_unique_passages: pd.Series,
+    inverted_index: dict,
+    avg_doc_length: float,
+    doc_lengths: dict,
+) -> pd.DataFrame:
+
+    query_inverted_index: dict = {}
+
+    query_tokens = task1.work_one_line(query)
+
+    for query_token in query_tokens:
+        query_inverted_index[query_token] = (
+            query_inverted_index.get(query_token, 0) + 1
+        )
+
+    # query_inverted_index inverted index for current query
+
+    corpus_size = len(doc_lengths.keys())
+
+    qids = np.ones(qid_unique_pids.shape[0], dtype=int) * qid
+    scores_BM25 = np.zeros(qid_unique_pids.shape[0])
+    pids = qid_unique_pids.to_numpy()
+
+    for index, pid in enumerate(qid_unique_pids):
+
+        scores_BM25[index] = BM25_score(
+            query,
+            query_inverted_index,
+            inverted_index,
+            pid,
+            doc_lengths[pid],
+            avg_doc_length,
+            corpus_size,
+        )
+
+    sorted_index = np.argsort(scores_BM25)
+    sorted_scores_BM25 = scores_BM25[sorted_index][::-1]
+    sorted_pids = pids[sorted_index][::-1]
+
+    top100_scores_BM25 = sorted_scores_BM25[:100]
+    top100_pids = sorted_pids[:100]
+
+    top100_pid_score_df = pd.DataFrame(columns=["qid", "pid", "score"])
+    top100_pid_score_df["qid"] = qids[: top100_pids.shape[0]]
+    top100_pid_score_df["pid"] = top100_pids
+    top100_pid_score_df["score"] = top100_scores_BM25
+
+    return top100_pid_score_df
+
+
+def iterate_qids_BM25(corpus_size: int):
+    """
+    iterate_qids Iterate over all qids get (at most) top 100 documents and
+    save final dataframe as a .csv
+
+    Pseude Code
+    1) Iterate over all qids
+    2) Select candidate passages that are to be re-ranked from
+    candidate-passages-top1000.tsv
+    3) get (at most) top 100 documents and their scores
+    4) store the values in a dataframe and then save it
+    """
+
+    inverted_index = get_inverted_index()
+
+    avg_doc_length = 0.0
+    doc_lengths: dict = {}
+
+    unique_pid, unique_passage = task2.get_unique_pids()
+
+    try:
+        assert unique_pid.shape[0] == corpus_size
+    except AssertionError:
+        print("Corpus size passed is different than pid-passage pairs")
+        corpus_size = unique_pid.shape[0]
+
+    # for pid, passage in tqdm(zip(unique_pid, unique_passage)):
+
+    #     stemmed_tokens = task1.work_one_line(passage)
+    #     doc_lengths[pid] = len(stemmed_tokens)
+    #     avg_doc_length += doc_lengths[pid]
+
+    # if pid == 8003559:
+    #     break
+
+    avg_doc_length = avg_doc_length / float(corpus_size)
+
+    # with open("doc_lengths.pickle", "wb") as f:
+    #     pickle.dump(doc_lengths, f, protocol=pickle.HIGHEST_PROTOCOL)
+    #     print("Done Saving doc_lengths as .pickle file")
+
+    if len(doc_lengths.keys()) == 0:
+        with open("doc_lengths.pickle", "rb") as handle:
+            doc_lengths = pickle.load(handle)
+            avg_doc_length = 56.11715414673177
+
+    # raise ArithmeticError
+
+    print("Corpus Size ", corpus_size)
+    print("Size of doc_lengths", len(doc_lengths.keys()))
+    print("Average length of document", avg_doc_length)
+
+    candidate_passages_df = pd.read_table(
+        "candidate-passages-top1000.tsv",
+        delimiter="\t",
+        header=None,
+    )
+    candidate_passages_df.columns = [
+        "qid",
+        "pid",
+        "query",
+        "passage",
+    ]  # type:ignore
+
+    qids, queries = get_test_queries()
+
+    df = pd.DataFrame(columns=["qid", "pid", "score"])
+
+    for qid, query in tqdm(zip(qids, queries)):
+
+        candidate_passages_df_qid = candidate_passages_df[
+            candidate_passages_df["qid"] == qid
+        ]
+        # for every qid get only the pids in candidate-passages-top1000.csv
+
+        qid_unique_pids = candidate_passages_df_qid["pid"]
+        qid_unique_passages = candidate_passages_df_qid["passage"]
+
+        qid_df = top100_pids_score_BM25(
+            qid,
+            query,
+            qid_unique_pids,
+            qid_unique_passages,
+            inverted_index,
+            avg_doc_length,
+            doc_lengths,
+        )
+        df = pd.concat([df, qid_df])
+        # break
+
+    df.to_csv("bm25.csv", index=False, header=False)  # add header= False
+    print("Done Saving top 100 BM25 scores of all queries as .csv file")
+
+
+corpus_size = TF_IDF_all_passages()
+TF_IDF_all_queries(corpus_size)
 
 iterate_qids()
+# corpus_size = 182469
+iterate_qids_BM25(corpus_size)
