@@ -510,9 +510,11 @@ def iterate_qids_BM25(corpus_size: int):
     print("Done Saving top 100 BM25 scores of all queries as .csv file")
 
 
-corpus_size = TF_IDF_all_passages()
-TF_IDF_all_queries(corpus_size)
+if __name__ == "__main__":
 
-iterate_qids()
-# corpus_size = 182469
-iterate_qids_BM25(corpus_size)
+    corpus_size = TF_IDF_all_passages()
+    TF_IDF_all_queries(corpus_size)
+
+    iterate_qids()
+    # corpus_size = 182469
+    iterate_qids_BM25(corpus_size)
