@@ -9,7 +9,7 @@ import task1
 import task3
 
 
-def score_laplace(
+def score_Laplace(
     query: str,
     pid: int,
     inverted_index: dict,
@@ -27,7 +27,7 @@ def score_laplace(
 
         score *= num / den
 
-    return score
+    return np.log(score)
 
 
 def top100_pids_score_Laplace(
@@ -47,7 +47,7 @@ def top100_pids_score_Laplace(
 
     for index, pid in enumerate(unique_pids):
 
-        scores[index] = score_laplace(
+        scores[index] = score_Laplace(
             query,
             pid,
             inverted_index,
@@ -109,8 +109,113 @@ def Laplace_smoothing():
         # break
 
     df.to_csv("laplace.csv", index=False, header=False)  # add header= False
-    print("Done Saving top 100 scores of all queries as .csv file")
+    print("Done Saving top 100 Laplace scores of all queries as .csv file")
+
+
+def score_Lidstone(
+    query: str,
+    pid: int,
+    inverted_index: dict,
+    vocab_length: int,
+    doc_length: int,
+    epsilon: float = 0.1,
+) -> float:
+
+    query_tokens = set(task1.work_one_line(query))
+
+    score = 1.0
+
+    for query_token in query_tokens:
+        num = inverted_index.get(query_token, {}).get(pid, 0) + epsilon
+        den = float(doc_length) + epsilon * float(vocab_length)
+
+        score *= num / den
+
+    return np.log(score)
+
+
+def top100_pids_score_Lidstone(
+    qid: int,
+    query: str,
+    unique_pids: pd.Series,
+    inverted_index: dict,
+    vocab_length: int,
+) -> pd.DataFrame:
+
+    qids = np.ones(unique_pids.shape[0], dtype=int) * qid
+    scores = np.zeros(unique_pids.shape[0])
+    pids = unique_pids.to_numpy()
+
+    with open("doc_lengths.pickle", "rb") as handle:
+        doc_lengths = pickle.load(handle)
+
+    for index, pid in enumerate(unique_pids):
+
+        scores[index] = score_Lidstone(
+            query,
+            pid,
+            inverted_index,
+            vocab_length,
+            doc_lengths[pid],
+        )
+
+    sorted_index = np.argsort(scores)
+    sorted_scores = scores[sorted_index][::-1]
+    sorted_pids = pids[sorted_index][::-1]
+
+    top100_scores = sorted_scores[:100]
+    top100_pids = sorted_pids[:100]
+
+    top100_pid_score_df = pd.DataFrame(columns=["qid", "pid", "score"])
+    top100_pid_score_df["qid"] = qids[: top100_pids.shape[0]]
+    top100_pid_score_df["pid"] = top100_pids
+    top100_pid_score_df["score"] = top100_scores
+
+    return top100_pid_score_df
+
+
+def Lidstone_smoothing():
+
+    inverted_index = task3.get_inverted_index()
+    vocab_length = len(inverted_index.keys())
+
+    candidate_passages_df = pd.read_table(
+        "candidate-passages-top1000.tsv",
+        delimiter="\t",
+        header=None,
+    )
+    candidate_passages_df.columns = [
+        "qid",
+        "pid",
+        "query",
+        "passage",
+    ]  # type:ignore
+
+    qids, queries = task3.get_test_queries()
+
+    df = pd.DataFrame(columns=["qid", "pid", "score"])
+
+    for qid, query in tqdm(zip(qids, queries)):
+        candidate_passages_df_qid = candidate_passages_df[
+            candidate_passages_df["qid"] == qid
+        ]
+        qid_unique_pids = candidate_passages_df_qid["pid"]
+        # work only with these pids and passages
+
+        qid_df = top100_pids_score_Lidstone(
+            qid,
+            query,
+            qid_unique_pids,
+            inverted_index,
+            vocab_length,
+        )
+        df = pd.concat([df, qid_df])
+        # break
+
+    df.to_csv("lidstone.csv", index=False, header=False)  # add header= False
+    print("Done Saving top 100 Lidstone scores of all queries as .csv file")
 
 
 if __name__ == "__main__":
     Laplace_smoothing()
+    Lidstone_smoothing()
