@@ -6,16 +6,14 @@ from tqdm import tqdm  # type:ignore
 
 import task1
 
-nltk.download("stopwords")
-
 
 def get_unique_pids() -> tuple[pd.Series, pd.Series]:
     """
     get_unique_pids read candidate-passages-top1000.tsv file
     and return unique passage ids (pid) and corresponding passages
 
-    There are in total 182469 unique passages so the retunred series
-    have the same lenght as well
+    There are in total 182469 unique passages so the returned series
+    have the same length as well
 
     :return: 2 series. pid, passages
     :rtype: tuple[pd.Series, pd.Series]
@@ -48,7 +46,7 @@ def work_on_one_passage(
 ) -> dict:
     """
     work_on_one_passage Work on one passage at a time
-    first function from task 1 is called to get a list of all
+    1) function from task 1 is called to get a list of all
     tokens after preprocessing and stemming
 
     Then the inverted index is updated accordingly
@@ -103,6 +101,7 @@ def get_inverted_index():
 
 
 if __name__ == "__main__":
+    nltk.download("stopwords")
     inverted_index = get_inverted_index()
     # print(inverted_index)
     unique_pids, unique_passages = get_unique_pids()
