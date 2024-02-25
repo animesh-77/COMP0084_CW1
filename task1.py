@@ -1,5 +1,6 @@
 import re
 
+import nltk  # type:ignore
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt  # type:ignore
@@ -135,6 +136,65 @@ def get_vocab_df(all_tokens: dict) -> pd.DataFrame:
     return vocab_df_sorted
 
 
+def get_vocab_df_no_stopwords(all_tokens: dict) -> pd.DataFrame:
+    """
+    get_vocab_df from a dictionary of tokens after removinf stopwords
+    and their count make a dataframe
+    with follwing columns
+
+    1) token / word
+    2) Count
+    3) Frequency of occurence / Prob of occurence
+    4) Rank of word/ token starting from 1 for most frequent
+    5) Empirical value of Frequency* rank
+
+    :param all_tokens: _description_
+    :type all_tokens: dict
+    :return: _description_
+    :rtype: pd.DataFrame
+    """
+
+    stop_words = nltk.corpus.stopwords.words("english")
+
+    stop_tokens = []
+    for i in stop_words:
+
+        stop_tokens.extend(work_one_line(i))
+    print(stop_tokens)
+
+    for key in stop_tokens:
+        all_tokens.pop(key, None)
+
+    vocab_df_no_stopwords = pd.DataFrame.from_dict(
+        all_tokens,
+        orient="index",
+        columns=["Count"],
+    )
+    vocab_df_no_stopwords = vocab_df_no_stopwords.reset_index()
+    vocab_df_no_stopwords.rename(columns={"index": "token"}, inplace=True)
+
+    vocab_df_sorted_no_stopwords = vocab_df_no_stopwords.sort_values(
+        by=["Count"], ascending=False
+    )
+    vocab_df_sorted_no_stopwords["rank"] = (
+        vocab_df_no_stopwords.index + 1
+    ).astype(float)
+
+    total_voc = np.sum(vocab_df_sorted_no_stopwords["Count"])
+    vocab_df_sorted_no_stopwords["Freq"] = (
+        vocab_df_sorted_no_stopwords["Count"] / total_voc
+    )
+    vocab_df_sorted_no_stopwords["Freq*rank"] = (
+        vocab_df_sorted_no_stopwords["Freq"]
+        * vocab_df_sorted_no_stopwords["rank"]
+    )
+    vocab_df_sorted_no_stopwords.to_csv(
+        "passage_collection_stats_no_stopwords.csv", index=False
+    )
+
+    return vocab_df_sorted_no_stopwords
+
+
 def make_plots_task1(vocab_df_sorted: pd.DataFrame) -> None:
 
     Hn = np.sum(np.reciprocal(vocab_df_sorted["rank"]))
@@ -185,6 +245,36 @@ def make_plots_task1(vocab_df_sorted: pd.DataFrame) -> None:
     plt.show()
 
 
+def make_plots_task1_no_stopwords(
+    vocab_df_sorted_no_stopwords: pd.DataFrame,
+) -> None:
+
+    Hn = np.sum(np.reciprocal(vocab_df_sorted_no_stopwords["rank"]))
+
+    zipf_freq = np.reciprocal(vocab_df_sorted_no_stopwords["rank"] * Hn)
+
+    plt.title("Zipf's Law Comparison in log scale without stopwords")
+    plt.xlabel("Frequence ranking of term")
+    plt.ylabel("Prob of occurence of term")
+    plt.loglog(
+        vocab_df_sorted_no_stopwords["rank"],
+        vocab_df_sorted_no_stopwords["Freq"],
+        color="blue",
+        label="Data",
+    )
+    plt.loglog(
+        vocab_df_sorted_no_stopwords["rank"],
+        zipf_freq,
+        linestyle="--",
+        color="black",
+        label="Zipf's curve",
+    )
+    plt.grid(True, which="major", ls="-")
+    plt.legend()
+    plt.savefig("Figure_3.svg")
+    plt.show()
+
+
 if __name__ == "__main__":
 
     # print(
@@ -196,6 +286,8 @@ if __name__ == "__main__":
     all_tokens = get_all_tokens()
 
     vocab_df_sorted = get_vocab_df(all_tokens)
+    vocab_df_sorted_no_stopwords = get_vocab_df_no_stopwords(all_tokens)
     # print(vocab_df_sorted.head(20))
 
     make_plots_task1(vocab_df_sorted)
+    make_plots_task1_no_stopwords(vocab_df_sorted_no_stopwords)
