@@ -68,10 +68,8 @@ def add_tokens(stemmed_tokens: list, all_tokens: dict) -> dict:
     :rtype: dict
     """
     for token in stemmed_tokens:
-        if token not in all_tokens:
-            all_tokens[token] = 1
-        else:
-            all_tokens[token] += 1
+
+        all_tokens[token] = all_tokens.get(token, 0) + 1
 
     return all_tokens
 
