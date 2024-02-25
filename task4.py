@@ -119,6 +119,8 @@ def Laplace_smoothing():
     inverted_index = task3.get_inverted_index()
     vocab_length = len(inverted_index.keys())
 
+    total_words = get_total_words()
+
     candidate_passages_df = pd.read_table(
         "candidate-passages-top1000.tsv",
         delimiter="\t",
@@ -135,6 +137,7 @@ def Laplace_smoothing():
 
     df_laplace = pd.DataFrame(columns=["qid", "pid", "score"])
     df_lidstone = pd.DataFrame(columns=["qid", "pid", "score"])
+    df_dirichlet = pd.DataFrame(columns=["qid", "pid", "score"])
 
     for qid, query in tqdm(zip(qids, queries)):
         candidate_passages_df_qid = candidate_passages_df[
@@ -160,6 +163,15 @@ def Laplace_smoothing():
             vocab_length,
         )
         df_lidstone = pd.concat([df_lidstone, qid_df_lidstone])
+
+        qid_df_dirichlet = top100_pids_score_Dirichlet(
+            qid,
+            query,
+            qid_unique_pids,
+            inverted_index,
+            total_words,
+        )
+        df_dirichlet = pd.concat([df_dirichlet, qid_df_dirichlet])
         # break
         # break
 
@@ -172,6 +184,11 @@ def Laplace_smoothing():
         "lidstone.csv", index=False, header=False
     )  # add header= False
     print("Done Saving top 100 Lidstone scores of all queries as .csv file")
+
+    df_dirichlet.to_csv(
+        "dirichlet_imp.csv", index=False, header=False
+    )  # add header= False
+    print("Done Saving top 100 Dirichlet scores of all queries as .csv file")
 
 
 def score_Lidstone(
@@ -274,6 +291,96 @@ def top100_pids_score_Lidstone(
     top100_pid_score_df["score"] = top100_scores
 
     return top100_pid_score_df
+
+
+def score_Dirichlet(
+    query: str,
+    pid: int,
+    inverted_index: dict,
+    doc_length: int,
+    mu: float = 50.0,
+    total_words: int = 10239641,
+) -> float:
+
+    query_tokens = set(task1.work_one_line(query))
+
+    score = 0.0
+
+    for query_token in query_tokens:
+        A1 = (doc_length * inverted_index.get(query_token, {}).get(pid, 0)) / (
+            (doc_length + mu) * doc_length
+        )
+
+        A2 = (mu * inverted_index.get(query_token, {}).get("count", 0)) / (
+            (doc_length + mu) * total_words
+        )
+
+        B = A1 + A2
+
+        try:
+            if B == 0:
+                raise ZeroDivisionError
+        except ZeroDivisionError:
+            print(query_token)
+            continue
+
+        score += np.log(B)
+
+    return score
+
+
+def top100_pids_score_Dirichlet(
+    qid: int,
+    query: str,
+    unique_pids: pd.Series,
+    inverted_index: dict,
+    total_words: int = 10239641,
+) -> pd.DataFrame:
+
+    with open("doc_lengths.pickle", "rb") as handle:
+        doc_lengths = pickle.load(handle)
+
+    qids = np.ones(unique_pids.shape[0], dtype=int) * qid
+    scores = np.zeros(unique_pids.shape[0])
+    pids = unique_pids.to_numpy()
+
+    for index, pid in enumerate(unique_pids):
+
+        scores[index] = score_Dirichlet(
+            query,
+            pid,
+            inverted_index,
+            doc_lengths[pid],
+            50.0,
+            total_words,
+        )
+
+    sorted_index = np.argsort(scores)
+    sorted_scores = scores[sorted_index][::-1]
+    sorted_pids = pids[sorted_index][::-1]
+
+    top100_scores = sorted_scores[:100]
+    top100_pids = sorted_pids[:100]
+
+    top100_pid_score_df = pd.DataFrame(columns=["qid", "pid", "score"])
+    top100_pid_score_df["qid"] = qids[: top100_pids.shape[0]]
+    top100_pid_score_df["pid"] = top100_pids
+    top100_pid_score_df["score"] = top100_scores
+
+    return top100_pid_score_df
+
+
+def get_total_words() -> int:
+    with open("doc_lengths.pickle", "rb") as handle:
+        doc_lengths = pickle.load(handle)
+
+    total_words = 0
+
+    for doc in tqdm(doc_lengths):
+        total_words += doc_lengths[doc]
+
+    print(f"Total number of words is {total_words}")
+    return total_words
 
 
 if __name__ == "__main__":
