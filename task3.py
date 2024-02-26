@@ -332,7 +332,7 @@ def iterate_qids():
         # break
 
     df.to_csv("tfidf.csv", index=False, header=False)  # add header= False
-    print("Done Saving top 100 scores of all queries as .csv file")
+    print("Done Saving top 100 TF-IDF scores of all queries as .csv file")
 
 
 def BM25_score(
@@ -356,10 +356,14 @@ def BM25_score(
 
     for query_token in query_tokens:
         try:
-            a1 = 1 / (corpus_size - inverted_index[query_token]["count"] + 0.5)
+            a1 = (corpus_size - inverted_index[query_token]["count"] + 0.5) / (
+                inverted_index[query_token]["count"] + 0.5
+            )
+
             a2 = ((k1 + 1) * inverted_index[query_token][pid]) / (
                 K + inverted_index[query_token][pid]
             )
+
             a3 = ((k2 + 1) * query_inverted_index[query_token]) / (
                 k2 * query_inverted_index[query_token]
             )
