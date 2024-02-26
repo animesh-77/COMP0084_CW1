@@ -15,6 +15,7 @@ def score_Laplace(
     inverted_index: dict,
     vocab_length: int,
     doc_length: int,
+    stop_tokens: dict,
 ) -> float:
     """
     score_Laplace get query max Likelihood score with
@@ -36,7 +37,7 @@ def score_Laplace(
     :rtype: float
     """
 
-    query_tokens = set(task1.work_one_line(query))
+    query_tokens = set(task1.work_one_line_no_stopwords(query, stop_tokens))
 
     score = 0.0
 
@@ -55,6 +56,7 @@ def top100_pids_score_Laplace(
     unique_pids: pd.Series,
     inverted_index: dict,
     vocab_length: int,
+    stop_tokens: dict,
 ) -> pd.DataFrame:
     """
     top100_pids_score_Laplace Get at most the top 100 passages with highest
@@ -91,6 +93,7 @@ def top100_pids_score_Laplace(
             inverted_index,
             vocab_length,
             doc_lengths[pid],
+            stop_tokens,
         )
 
     sorted_index = np.argsort(scores)
@@ -115,7 +118,7 @@ def Laplace_smoothing():
 
     Laplace smoothing applied in query likelihood estimation
     """
-
+    stop_tokens = task1.stopwords_dict()
     inverted_index = task3.get_inverted_index()
     vocab_length = len(inverted_index.keys())
 
@@ -152,6 +155,7 @@ def Laplace_smoothing():
             qid_unique_pids,
             inverted_index,
             vocab_length,
+            stop_tokens,
         )
         df_laplace = pd.concat([df_laplace, qid_df_laplace])
 
@@ -161,6 +165,7 @@ def Laplace_smoothing():
             qid_unique_pids,
             inverted_index,
             vocab_length,
+            stop_tokens,
         )
         df_lidstone = pd.concat([df_lidstone, qid_df_lidstone])
 
@@ -170,6 +175,7 @@ def Laplace_smoothing():
             qid_unique_pids,
             inverted_index,
             total_words,
+            stop_tokens,
         )
         df_dirichlet = pd.concat([df_dirichlet, qid_df_dirichlet])
         # break
@@ -197,6 +203,7 @@ def score_Lidstone(
     inverted_index: dict,
     vocab_length: int,
     doc_length: int,
+    stop_tokens: dict,
     epsilon: float = 0.1,
 ) -> float:
     """
@@ -221,7 +228,7 @@ def score_Lidstone(
     :rtype: float
     """
 
-    query_tokens = set(task1.work_one_line(query))
+    query_tokens = set(task1.work_one_line_no_stopwords(query, stop_tokens))
 
     score = 0.0
 
@@ -240,6 +247,7 @@ def top100_pids_score_Lidstone(
     unique_pids: pd.Series,
     inverted_index: dict,
     vocab_length: int,
+    stop_tokens: dict,
 ) -> pd.DataFrame:
     """
     top100_pids_score_Lidstone For a given query
@@ -276,6 +284,7 @@ def top100_pids_score_Lidstone(
             inverted_index,
             vocab_length,
             doc_lengths[pid],
+            stop_tokens,
         )
 
     sorted_index = np.argsort(scores)
@@ -298,11 +307,12 @@ def score_Dirichlet(
     pid: int,
     inverted_index: dict,
     doc_length: int,
+    stop_tokens: dict,
+    total_words: int,
     mu: float = 50.0,
-    total_words: int = 10239641,
 ) -> float:
 
-    query_tokens = set(task1.work_one_line(query))
+    query_tokens = set(task1.work_one_line_no_stopwords(query, stop_tokens))
 
     score = 0.0
 
@@ -334,7 +344,8 @@ def top100_pids_score_Dirichlet(
     query: str,
     unique_pids: pd.Series,
     inverted_index: dict,
-    total_words: int = 10239641,
+    total_words: int,
+    stop_tokens: dict,
 ) -> pd.DataFrame:
 
     with open("doc_lengths.pickle", "rb") as handle:
@@ -351,8 +362,9 @@ def top100_pids_score_Dirichlet(
             pid,
             inverted_index,
             doc_lengths[pid],
-            50.0,
+            stop_tokens,
             total_words,
+            50.0,
         )
 
     sorted_index = np.argsort(scores)
