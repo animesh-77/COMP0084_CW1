@@ -3,7 +3,6 @@ import pickle
 import numpy as np
 import pandas as pd
 from scipy.spatial import distance  # type:ignore
-
 from tqdm import tqdm  # type:ignore
 
 import task1
@@ -31,7 +30,7 @@ def get_test_queries() -> tuple[pd.Series, pd.Series]:
     return test_queries_df["qid"], test_queries_df["query"]
 
 
-def get_inverted_index() -> dict:
+def get_inverted_index(remove_stopwords: bool = True) -> dict:
     """
     get_inverted_index Read the inverted index stored as a pickle file
     add a count key to all tokens and return it
@@ -46,13 +45,22 @@ def get_inverted_index() -> dict:
     with open("inverted_index.pickle", "rb") as handle:
         inverted_index = pickle.load(handle)
 
+    if remove_stopwords is True:
+        stop_tokens = task1.stopwords_dict()
+        for stop_token in stop_tokens:
+            inverted_index.pop(stop_token, None)
+
     for token in inverted_index.keys():
         inverted_index[token]["count"] = len(inverted_index[token].keys())
     return inverted_index
 
 
 def TF_IDF_one_passage(
-    pid: int, passage: str, corpus_size: float, inverted_index
+    pid: int,
+    passage: str,
+    corpus_size: float,
+    inverted_index,
+    stop_tokens: dict,
 ) -> dict:
     """
     TF_IDF_one_passage TF-IDF vector for a single passage
@@ -69,7 +77,8 @@ def TF_IDF_one_passage(
     :rtype: dict
     """
 
-    passage_tokens = task1.work_one_line(passage)
+    # passage_tokens = task1.work_one_line(passage)
+    passage_tokens = task1.work_one_line_no_stopwords(passage, stop_tokens)
     total_tokens = float(len(passage_tokens))
     TF_IDF_vec = dict.fromkeys(set(passage_tokens))
 
@@ -81,7 +90,7 @@ def TF_IDF_one_passage(
     return TF_IDF_vec
 
 
-def TF_IDF_all_passages() -> int:
+def TF_IDF_all_passages(stop_tokens: dict) -> int:
     """
     TF_IDF_all_passages Generate and store a dictionary of TF-IDF of
     all passages
@@ -99,7 +108,11 @@ def TF_IDF_all_passages() -> int:
     for pid, passage in tqdm(zip(pids, passages)):
         # print(pid, passage)
         tf_idf_passages[pid] = TF_IDF_one_passage(
-            pid, passage, float(corpus_size), inverted_index
+            pid,
+            passage,
+            float(corpus_size),
+            inverted_index,
+            stop_tokens,
         )
         # break
     with open("tf_idf_passages.pickle", "wb") as f:
@@ -110,7 +123,7 @@ def TF_IDF_all_passages() -> int:
 
 
 def TF_IDF_one_query(
-    qid: int, query: str, corpus_size: float, inverted_index
+    qid: int, query: str, corpus_size: float, inverted_index, stop_tokens: dict
 ) -> dict:
     """
     TF_IDF_one_query generate TF-IDF vector for one query at
@@ -128,7 +141,7 @@ def TF_IDF_one_query(
     :rtype: dict
     """
 
-    query_tokens = task1.work_one_line(query)
+    query_tokens = task1.work_one_line_no_stopwords(query, stop_tokens)
     total_tokens = float(len(query_tokens))
     query_inverted_index: dict = {}
 
@@ -153,7 +166,7 @@ def TF_IDF_one_query(
     return TF_IDF_vec
 
 
-def TF_IDF_all_queries(corpus_size: float):
+def TF_IDF_all_queries(corpus_size: float, stop_tokens: dict):
     """
     TF_IDF_all_queries iterate over all queries and
     calculate and store TF_IDF score in a dictionary
@@ -171,10 +184,7 @@ def TF_IDF_all_queries(corpus_size: float):
     tf_idf_queries = {}
     for qid, query in tqdm(zip(qids, queries)):
         tf_idf_queries[qid] = TF_IDF_one_query(
-            qid,
-            query,
-            float(corpus_size),
-            inverted_index,
+            qid, query, float(corpus_size), inverted_index, stop_tokens
         )
         # break
 
@@ -333,6 +343,7 @@ def BM25_score(
     doc_length: int,
     avg_doc_length: float,
     corpus_size: float,
+    stop_tokens: dict,
     k1: float = 1.2,
     k2: float = 100,
     b: float = 0.75,
@@ -340,7 +351,7 @@ def BM25_score(
 
     K = k1 * ((1 - b) + b * (float(doc_length) / avg_doc_length))
 
-    query_tokens = set(task1.work_one_line(query))
+    query_tokens = set(task1.work_one_line_no_stopwords(query, stop_tokens))
     score = 0.0
 
     for query_token in query_tokens:
@@ -370,11 +381,12 @@ def top100_pids_score_BM25(
     inverted_index: dict,
     avg_doc_length: float,
     doc_lengths: dict,
+    stop_tokens: dict,
 ) -> pd.DataFrame:
 
     query_inverted_index: dict = {}
 
-    query_tokens = task1.work_one_line(query)
+    query_tokens = task1.work_one_line_no_stopwords(query, stop_tokens)
 
     for query_token in query_tokens:
         query_inverted_index[query_token] = (
@@ -399,6 +411,7 @@ def top100_pids_score_BM25(
             doc_lengths[pid],
             avg_doc_length,
             corpus_size,
+            stop_tokens,
         )
 
     sorted_index = np.argsort(scores_BM25)
@@ -416,7 +429,7 @@ def top100_pids_score_BM25(
     return top100_pid_score_df
 
 
-def iterate_qids_BM25(corpus_size: int):
+def iterate_qids_BM25(corpus_size: int, stop_tokens: dict):
     """
     iterate_qids Iterate over all qids get (at most) top 100 documents and
     save final dataframe as a .csv
@@ -431,9 +444,6 @@ def iterate_qids_BM25(corpus_size: int):
 
     inverted_index = get_inverted_index()
 
-    avg_doc_length = 0.0
-    doc_lengths: dict = {}
-
     unique_pid, unique_passage = task2.get_unique_pids()
 
     try:
@@ -442,25 +452,13 @@ def iterate_qids_BM25(corpus_size: int):
         print("Corpus size passed is different than pid-passage pairs")
         corpus_size = unique_pid.shape[0]
 
-    # for pid, passage in tqdm(zip(unique_pid, unique_passage)):
+    with open("doc_lengths.pickle", "rb") as handle:
+        doc_lengths = pickle.load(handle)
+    avg_doc_length = 0.0
+    for doc in doc_lengths:
+        avg_doc_length += doc_lengths[doc]
 
-    #     stemmed_tokens = task1.work_one_line(passage)
-    #     doc_lengths[pid] = len(stemmed_tokens)
-    #     avg_doc_length += doc_lengths[pid]
-
-    # if pid == 8003559:
-    #     break
-
-    avg_doc_length = avg_doc_length / float(corpus_size)
-
-    # with open("doc_lengths.pickle", "wb") as f:
-    #     pickle.dump(doc_lengths, f, protocol=pickle.HIGHEST_PROTOCOL)
-    #     print("Done Saving doc_lengths as .pickle file")
-
-    if len(doc_lengths.keys()) == 0:
-        with open("doc_lengths.pickle", "rb") as handle:
-            doc_lengths = pickle.load(handle)
-            avg_doc_length = 56.11715414673177
+    avg_doc_length /= float(len(doc_lengths))
 
     # raise ArithmeticError
 
@@ -502,6 +500,7 @@ def iterate_qids_BM25(corpus_size: int):
             inverted_index,
             avg_doc_length,
             doc_lengths,
+            stop_tokens,
         )
         df = pd.concat([df, qid_df])
         # break
@@ -512,9 +511,11 @@ def iterate_qids_BM25(corpus_size: int):
 
 if __name__ == "__main__":
 
-    corpus_size = TF_IDF_all_passages()
-    TF_IDF_all_queries(corpus_size)
+    stop_tokens = task1.stopwords_dict()
+    corpus_size = TF_IDF_all_passages(stop_tokens)
+    # corpus_size Total number of unique passages
+    TF_IDF_all_queries(corpus_size, stop_tokens)
 
     iterate_qids()
     # corpus_size = 182469
-    iterate_qids_BM25(corpus_size)
+    iterate_qids_BM25(corpus_size, stop_tokens)
