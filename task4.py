@@ -192,7 +192,7 @@ def Laplace_smoothing():
     print("Done Saving top 100 Lidstone scores of all queries as .csv file")
 
     df_dirichlet.to_csv(
-        "dirichlet_imp.csv", index=False, header=False
+        "dirichlet.csv", index=False, header=False
     )  # add header= False
     print("Done Saving top 100 Dirichlet scores of all queries as .csv file")
 
