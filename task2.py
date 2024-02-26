@@ -42,8 +42,12 @@ def get_unique_pids() -> tuple[pd.Series, pd.Series]:
 
 
 def work_on_one_passage(
-    unique_pid: int, unique_passage: str, inverted_index: dict
-) -> dict:
+    unique_pid: int,
+    unique_passage: str,
+    inverted_index: dict,
+    doc_lengths: dict,
+    stop_tokens: dict,
+) -> tuple[dict, dict]:
     """
     work_on_one_passage Work on one passage at a time
     1) function from task 1 is called to get a list of all
@@ -63,8 +67,10 @@ def work_on_one_passage(
     :rtype: dict
     """
 
-    stemmed_tokens = task1.work_one_line(unique_passage)
-
+    stemmed_tokens = task1.work_one_line_no_stopwords(
+        unique_passage, stop_tokens
+    )
+    doc_lengths[unique_pid] = len(stemmed_tokens)
     for token in stemmed_tokens:
         try:
             # print(token, inverted_index[token])
@@ -75,17 +81,18 @@ def work_on_one_passage(
                     unique_pid: inverted_index[token].get(unique_pid, 0) + 1,
                 }
             )
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             print(token)
             print(e)
+            pass
 
-    return inverted_index
+    return inverted_index, doc_lengths
 
 
 def get_inverted_index():
 
     vocab_df_sorted = pd.read_csv(
-        "passage_collection_stats.csv",
+        "passage_collection_stats_no_stopwords.csv",
         na_filter=False,
     )
     inverted_index = {}
@@ -102,24 +109,26 @@ def get_inverted_index():
 
 if __name__ == "__main__":
     nltk.download("stopwords")
+    stop_tokens = task1.stopwords_dict()
     inverted_index = get_inverted_index()
     # print(inverted_index)
     unique_pids, unique_passages = get_unique_pids()
     # get all unique 182469 passages and thier ids
-
+    doc_lengths: dict = {}
     for index, [pid, passage] in tqdm(
         enumerate(zip(unique_pids, unique_passages))
     ):
-        inverted_index = work_on_one_passage(pid, passage, inverted_index)
+        inverted_index, doc_lengths = work_on_one_passage(
+            pid, passage, inverted_index, doc_lengths, stop_tokens
+        )
 
         # if index == 1000:
         #     break
 
-    # print(inverted_index)
-    # with open("inverted_index.json", "w") as f:
-    #     json.dump(inverted_index, f)
-    #     print("Done Saving inverted index as .json file")
-
     with open("inverted_index.pickle", "wb") as f:
         pickle.dump(inverted_index, f, protocol=pickle.HIGHEST_PROTOCOL)
         print("Done Saving inverted index as .pickle file")
+
+    with open("doc_lengths.pickle", "wb") as f:
+        pickle.dump(doc_lengths, f, protocol=pickle.HIGHEST_PROTOCOL)
+        print("Done Saving doc_lengths as .pickle file")

@@ -9,6 +9,70 @@ from nltk.tokenize import word_tokenize  # type:ignore
 from tqdm import tqdm  # type:ignore
 
 
+def stopwords_dict() -> dict:
+
+    stop_words = nltk.corpus.stopwords.words("english")
+
+    stop_tokens = []
+    for i in stop_words:
+
+        stop_tokens.extend(work_one_line(i))
+    return dict.fromkeys(stop_tokens)
+
+
+def work_one_line_no_stopwords(line: str, stop_tokens: dict) -> list:
+    """
+    work_one_line work on one line at a time and
+    return all tokens present in it
+
+    Steps taken in this function:
+    1) convert everything to lower case
+    2) All special characters replaced with " "
+    3) All successuve " " removed
+    4) String is then tokenized
+    5) Porter stemmer used on individual tokens
+    6) List of tokens after PorterStemmer has been used
+
+    :param line: string value to be tokenized
+    :type line: str
+    :return: list of all tokens identified in the string
+    :rtype: list
+    """
+
+    # convert whole line in lower case
+    line = line.lower()
+
+    # replace all kind of punctuation with " "
+    line = re.sub(r"[!\"#$%&\'()*+,-./:;<=>?@\[\\\]^_`{|}~]", " ", line)
+
+    # remove successive white spaces
+    line = re.sub(r"\s+", " ", line)
+
+    tokens = word_tokenize(line)
+
+    tokens = [token for token in tokens if token.isalpha()]
+
+    # print(tokens)
+
+    # define Porter Stemmer from NLTK
+    porter_stemmer = PorterStemmer()
+
+    # stem tokenized text and print first 500 tokens
+    # stemmed_tokens = [
+    #     porter_stemmer.stem(word)
+    #     for word in tokens
+    #     if porter_stemmer.stem(word) not in stop_tokens
+    # ]
+    stemmed_tokens = [
+        stemmed_word
+        for word in tokens
+        if (stemmed_word := porter_stemmer.stem(word)) not in stop_tokens
+    ]
+    # print(stemmed_tokens)
+
+    return stemmed_tokens
+
+
 def work_one_line(line: str) -> list:
     """
     work_one_line work on one line at a time and
@@ -154,13 +218,7 @@ def get_vocab_df_no_stopwords(all_tokens: dict) -> pd.DataFrame:
     :rtype: pd.DataFrame
     """
 
-    stop_words = nltk.corpus.stopwords.words("english")
-
-    stop_tokens = []
-    for i in stop_words:
-
-        stop_tokens.extend(work_one_line(i))
-    print(stop_tokens)
+    stop_tokens = stopwords_dict()
 
     for key in stop_tokens:
         all_tokens.pop(key, None)
