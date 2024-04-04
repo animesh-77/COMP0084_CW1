@@ -1,0 +1,19 @@
+General mark penalties:
+	NA
+
+Task 1:
+	Preprocessing steps are only partially justified (-2 marks)
+	There was no comprehensive comparison / explanation driven by Zipf's law formal derivation / formulae (-10 marks)
+	Difference of using / not using stop words was not quantified (-1 mark)
+
+Task 2:
+	The inverted index only stores term counts (-5 marks)
+
+Task 3:
+	NA
+
+Task 4:
+	Empirical examples were not presented in a clear way (-2 marks)
+
+	epsilon value (-1.5 marks)
+	

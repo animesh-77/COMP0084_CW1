@@ -10,6 +10,14 @@ from tqdm import tqdm  # type:ignore
 
 
 def stopwords_dict() -> dict:
+    """
+    stopwords_dict return a dictionary containg stems of all stop words
+
+    _extended_summary_
+
+    :return: _description_
+    :rtype: dict
+    """
 
     stop_words = nltk.corpus.stopwords.words("english")
 
@@ -31,6 +39,7 @@ def work_one_line_no_stopwords(line: str, stop_tokens: dict) -> list:
     3) All successuve " " removed
     4) String is then tokenized
     5) Porter stemmer used on individual tokens
+    5.5) remove all stopwords stems
     6) List of tokens after PorterStemmer has been used
 
     :param line: string value to be tokenized
